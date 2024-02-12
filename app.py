@@ -2,6 +2,8 @@ import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceHubEmbeddings
+from langchain_community.vectorstores import faiss
 
 
 def get_pdf_text(pdf_docs):
@@ -26,6 +28,16 @@ def get_text_chunks(raw_text):
     return chunks
 
 
+def get_vectorstore(text_chunks):
+    """
+    Create embeddings for each chunk
+    """
+    model_name = 'hkunlp/instructor-xl'
+    embeddings = HuggingFaceHubEmbeddings()
+    vectorestore = faiss.FAISS.from_texts(text_chunks, embeddings)
+    return vectorestore
+
+
 def main():
     load_dotenv()
 
@@ -46,7 +58,8 @@ def main():
                 # Split content into small chunks
                 text_chunks = get_text_chunks(raw_text)
 
-                # Create embeddins for each chunk
+                # Create embeddings for each chunk
+                vectorstore = get_vectorstore(text_chunks)
 
 
 if __name__ == '__main__':
