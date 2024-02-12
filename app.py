@@ -1,9 +1,14 @@
+import os
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceHubEmbeddings
 from langchain_community.vectorstores import faiss
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain_community.llms import HuggingFaceHub
+from htmlTemplates import *
 
 
 def get_pdf_text(pdf_docs):
@@ -38,13 +43,66 @@ def get_vectorstore(text_chunks):
     return vectorestore
 
 
+def get_conversation_chain(vectorstore):
+    """
+    Get the conversation chain
+    """
+    import os
+    huggingfacehub_api_token = os.getenv('UGGINGFACEHUB_API_TOKEN')
+
+    llm = HuggingFaceHub(
+        huggingfacehub_api_token=huggingfacehub_api_token,
+        repo_id="google/flan-t5-xxl",
+        model_kwargs={
+            "max_new_tokens": 512,
+            "top_k": 30,
+            "temperature": 0.5,
+            "max_length": 512,
+        },
+    )
+    memory = ConversationBufferMemory(
+        memory_key='chat_history', return_messages=True)
+    conversation_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=vectorstore.as_retriever(),
+        memory=memory,
+    )
+    return conversation_chain
+
+
+def handle_user_question(user_question):
+    response = st.session_state.conversation({'question': user_question})
+    st.session_state.chat_history = response['chat_history']
+
+    for i, message in enumerate(response['chat_history']):
+        if i % 2 == 0:
+            st.write(user_template.replace(
+                "{{MSG}}", message.content), unsafe_allow_html=True)
+        else:
+            st.write(bot_template.replace(
+                "{{MSG}}", message.content), unsafe_allow_html=True)
+
+    pass
+
+
 def main():
     load_dotenv()
-
     st.set_page_config(page_title='Multiple PDF Chat',
                        page_icon='🦄', layout='wide')
+
+    st.write(css, unsafe_allow_html=True)
+
+    if 'conversation' not in st.session_state:
+        st.session_state.conversation = None
+
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = None
+
     st.header('Chat with multiple PDFs 🦄')
-    st.text_input('Ask a question about your documents:')
+    user_question = st.text_input('Ask a question about your documents:')
+
+    if user_question:
+        handle_user_question(user_question)
 
     with st.sidebar:
         st.subheader('Your documents:')
@@ -60,6 +118,10 @@ def main():
 
                 # Create embeddings for each chunk
                 vectorstore = get_vectorstore(text_chunks)
+
+                # Create conversation chain
+                st.session_state.conversation = get_conversation_chain(
+                    vectorstore)
 
 
 if __name__ == '__main__':

@@ -3,8 +3,11 @@ css = '''
 .chat-message {
     padding: 1.5rem; border-radius: 0.a5rem; margin-bottom: 1rem; display: flex
 }
-.chat-message .user {
+.chat-message.user {
     background-color: #2b313e
+}
+.chat-message.bot {
+    background-color: #475063
 }
 .chat-message .avatar {
     with: 15%
